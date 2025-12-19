@@ -18,32 +18,13 @@ st.title("📊 EDGAR Filings Analytics Dashboard (2025)")
 # =====================================================
 # MongoDB connection (strict: read from .env only)
 # =====================================================
-# Load values explicitly from a .env file so we do not accidentally
-# accept MONGO_URI from other environment sources.
-_env = dotenv_values(".env")
-MONGO_URI = _env.get("MONGO_URI")
-MONGO_DB = _env.get("MONGO_DB") or "edgar"
-
-if not MONGO_URI:
-    st.error(
-        "Missing `MONGO_URI` in `.env`. Please create a `.env` file with `MONGO_URI=<your mongodb uri>` (do not put secrets in source control)."
-    )
-    st.stop()
+from streamlit_app.mongo import get_mongo_client_from_env
 
 try:
-    client = MongoClient(
-        MONGO_URI,
-        tls=True,
-        tlsCAFile=certifi.where(),
-        serverSelectionTimeoutMS=30000,
-        socketTimeoutMS=30000,
-        connectTimeoutMS=30000,
-    )
-    # fail fast: ensure the client can reach the server
-    client.admin.command("ping")
+    client, MONGO_DB = get_mongo_client_from_env(".env")
     db = client[MONGO_DB]
-except Exception as exc:  # pragma: no cover - runtime failure handling
-    st.error(f"Unable to connect to MongoDB: {exc}")
+except RuntimeError as exc:  # pragma: no cover - runtime failure handling
+    st.error(str(exc))
     st.stop()
 
 # =====================================================

@@ -1,136 +1,133 @@
-EDGAR Filings Big Data Analytics
+# EDGAR Filings — Data Cleaning & Visualization
 
-MongoDB • Docker • Dask • uv • Pydantic • mypy • PyTest • Streamlit
+A lightweight, high-performance data cleaning and visualization toolkit for SEC EDGAR filings built with Python, Dask, Pydantic, MongoDB, and Streamlit.
 
-Project Overview
+This project ingests EDGAR master-index and filing data, standardizes and validates schemas, computes production-ready aggregations (gold layer), and provides an interactive Streamlit dashboard to explore cleaned filings and analytics.
 
-This project implements an end-to-end Big Data pipeline using SEC EDGAR filings and MongoDB deployed as a Docker-based replica set.
-The pipeline ingests 750,000+ filing records, performs data cleaning and schema validation, builds gold-layer analytical aggregations, and visualizes insights through an interactive Streamlit dashboard.
+## Features
+- **Schema validation & type coercion** (Pydantic + Dask/pandas)
+- Cleans numeric columns (prices, amounts), date columns, and boolean flags
+- Normalizes text columns and removes invalid entries (e.g., missing CIKs)
+- Deduplication and ingestion safeguards
+- Computes production aggregations (Gold layer):
+  - **Agg1:** Monthly filings by form (collection: `gold_filings_by_form_month`)
+  - **Agg2:** Forms by year (collection: `gold_forms_by_year`)
+  - **Agg3:** Top filers and 10-K specific aggregations (collections: `gold_top_ciks`, `gold_10k_top_ciks`, `gold_10k_recent`)
+- Streamlit dashboard for filtering, charting, and viewing cleaned data and aggregations
 
-The solution follows industry-style data engineering best practices and satisfies all capstone rubric requirements.
+## Installation of Required Libraries
+Install project dependencies (uses `uv` for environment management):
 
-Big Data Platform & Architecture
-Platform Choice
+```bash
+uv sync --all-extras
+```
 
-MongoDB deployed via Docker Compose
+> Tip: Check `pyproject.toml` for exact dependency versions.
 
-3-node Replica Set (rs0)
+## Environment variables (`.env`)
+Create a `.env` at the repository root (do not commit it):
 
-mongo1 (PRIMARY)
+```text
+cp .env.example .env
+# then edit .env to include:
+MONGO_URI="<your mongodb connection string>"
+MONGO_DB="edgar"
+SEC_USER_AGENT="Your Name your.email@domain"
+EDGAR_DATA_DIR="data/edgar_cache"
+```
 
-mongo2 (SECONDARY)
+The Streamlit app reads `MONGO_URI` strictly from `.env` and will fail fast with a clear error if it is missing or the connection cannot be established.
 
-mongo3 (SECONDARY)
+## Running the Pipeline
+Important: global arguments (if any) are passed before the command when using `uv`.
 
-Why MongoDB?
+### 1) Start MongoDB (Docker Compose)
+```bash
+docker compose up -d
+```
 
-Native support for large semi-structured datasets
+Verify replica set (if running the Docker-based RS):
+```bash
+docker exec -it mongo1 mongosh --eval "rs.status()"
+```
 
-Horizontal scalability
+### 2) Ingest (raw layer)
+```bash
+PYTHONPATH=src uv run python -m edgar_pipeline.cli ingest --from-year 2025 --to-year 2025
+```
 
-Replica sets demonstrate distributed system behavior
+### 3) Clean & Validate (clean layer)
+```bash
+PYTHONPATH=src uv run python -m edgar_pipeline.cli clean
+```
 
-Excellent fit for JSON-like EDGAR filings
+### 4) Build Gold Aggregations
+```bash
+PYTHONPATH=src uv run python -m edgar_pipeline.cli gold
+```
 
-Architecture Diagram
+### 5) Run Streamlit Dashboard
+```bash
+streamlit run streamlit_app/app.py
+# open http://localhost:8501 in your browser
+```
 
-See:
+## Library Requirements
+- dask[dataframe]
+- pandas
+- pyarrow
+- pymongo
+- pydantic
+- python-dotenv
+- requests
+- streamlit
+- certifi
 
-diagrams/architecture.mmd
+(See `pyproject.toml` for full list and pinned versions.)
 
-High-Level Data Flow
-SEC EDGAR Index
-      ↓
-Ingest (Python + Dask)
-      ↓
-MongoDB Raw Layer
-      ↓
-Clean & Validate (Pydantic)
-      ↓
-MongoDB Clean Layer
-      ↓
-Gold Aggregations
-      ↓
-MongoDB Gold Collections
-      ↓
-Streamlit Dashboard
-
-Dataset Description
-
-Source
-SEC EDGAR Quarterly Master Index
-
-https://www.sec.gov/Archives/edgar/full-index/
-
-Volume
-
-750,000+ rows (configurable by year range)
-
-Easily scalable to millions of records
-
-Core Columns (8+)
-
-cik
-
-company_name
-
-form_type
-
-date_filed
-
-year
-
-quarter
-
-accession_number
-
-file_name
-
-edgar_url
-
-ingest_ts
-
-Processing Stack (Rubric Aligned)
-Requirement	Tool
-Big Data Processing	Dask
-Environment Management	uv
-Schema Validation	Pydantic
-Type Checking	mypy
-Logging	Python logging
-Testing	PyTest (3+ tests)
-Visualization	Streamlit
-Project Structure
+## Project Structure
+```
 edgar-mongo-bigdata/
-│
-├── docker/
-│   └── mongo-init/
-│       └── init.js
-│
-├── src/
-│   └── edgar_pipeline/
-│       ├── ingest/
-│       ├── clean/
-│       ├── aggregate/
-│       ├── enrich/
-│       ├── models.py
-│       ├── db.py
-│       ├── cli.py
-│
-├── streamlit_app/
-│   └── app.py
-│
-├── tests/
-│   ├── test_models.py
-│   ├── test_cleaning.py
-│   └── test_aggregation.py
-│
-├── diagrams/
-│   └── architecture.mmd
-│
-├── docker-compose.yml
-├── pyproject.toml
-├── uv.lock
-├── README.md
+├─ data/                       # EDGAR master index and cached filings
+├─ docker/
+│  └─ mongo-init/              # Mongo init scripts and indexes
+├─ diagrams/                   # Architecture diagrams (Mermaid)
+├─ streamlit_app/
+│  └─ app.py                   # Streamlit dashboard
+├─ src/
+│  └─ edgar_pipeline/          # Pipeline code (ingest, clean, aggregate, enrich)
+├─ tests/                      # Unit tests (pytest)
+├─ pyproject.toml
+├─ docker-compose.yml
+├─ .env.example                # Example env file (copy to .env)
+├─ README.md
+└─ uv.lock
+```
+
+## Additional Usage
+Run Streamlit in development mode (auto-reload on save):
+
+```bash
+streamlit run streamlit_app/app.py --server.runOnSave true
+```
+
+Run tests and type checking:
+
+```bash
+uv run pytest
+uv run mypy src
+```
+
+## Contribution
+- Pull requests and suggestions are welcome ✅
+- Please open an issue before submitting large or breaking changes
+
+---
+
+If you'd like, I can also:
+- add a concise `README` badge section, or
+- add a short `DEVELOPMENT.md` with local dev steps and how to run tests locally.
+
 
 Setup & Installation
 1️⃣ Environment Variables
