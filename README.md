@@ -51,22 +51,28 @@ Verify replica set (if running the Docker-based RS):
 docker exec -it mongo1 mongosh --eval "rs.status()"
 ```
 
-### 2) Ingest (raw layer)
+### 2) Install Dependencies
+Install project dependencies before running the pipeline:
+```bash
+uv sync --all-extras
+```
+
+### 3) Ingest (raw layer)
 ```bash
 PYTHONPATH=src uv run python -m edgar_pipeline.cli ingest --from-year 2025 --to-year 2025
 ```
 
-### 3) Clean & Validate (clean layer)
+### 4) Clean & Validate (clean layer)
 ```bash
 PYTHONPATH=src uv run python -m edgar_pipeline.cli clean
 ```
 
-### 4) Build Gold Aggregations
+### 5) Build Gold Aggregations
 ```bash
 PYTHONPATH=src uv run python -m edgar_pipeline.cli gold
 ```
 
-### 5) Run Streamlit Dashboard
+### 6) Run Streamlit Dashboard
 ```bash
 streamlit run streamlit_app/app.py
 # open http://localhost:8501 in your browser
@@ -123,144 +129,3 @@ uv run mypy src
 - Please open an issue before submitting large or breaking changes
 
 ---
-
-If you'd like, I can also:
-- add a concise `README` badge section, or
-- add a short `DEVELOPMENT.md` with local dev steps and how to run tests locally.
-
-
-Setup & Installation
-1️⃣ Environment Variables
-cp .env.example .env
-
-
-Edit .env:
-
-MONGO_URI="mongodb+srv://user_name:password@cluster0.afgqezq.mongodb.net/?appName=Cluster0"
-MONGO_DB="edgar"
-SEC_USER_AGENT=YourName your.email@rowan.edu
-EDGAR_DATA_DIR="data/edgar_cache"
-
-2️⃣ Start MongoDB Replica Set
-docker compose up -d
-
-
-Verify replica set:
-
-docker exec -it mongo1 mongosh --eval "rs.status()"
-
-3️⃣ Install Dependencies
-uv sync --all-extras
-
-Running the Pipeline
-
-Important: Global arguments must be specified before the command.
-
-🔹 Ingest (Raw Layer)
-PYTHONPATH=src uv run python -m edgar_pipeline.cli \
-  --from-year 2025 \
-  --to-year 2025 \
-  ingest
-
-
-Raw Layer Verification
-
-db.raw_filings.countDocuments()
-
-🔹 Clean & Validate (Clean Layer)
-PYTHONPATH=src uv run python -m edgar_pipeline.cli clean
-
-
-Cleaning Includes
-
-Missing value handling
-
-Text normalization
-
-Date standardization
-
-Deduplication
-
-Pydantic schema validation
-
-🔹 Aggregations (Gold Layer)
-PYTHONPATH=src uv run python -m edgar_pipeline.cli gold
-
-
-Gold Collections Created
-
-gold_filings_by_form_month
-
-gold_forms_by_year
-
-gold_top_ciks
-
-gold_10k_by_year
-
-gold_10k_top_ciks
-
-gold_10k_recent
-
-gold_10k_by_sic (optional enrichment)
-
-🔹 Run Everything (Optional)
-PYTHONPATH=src uv run python -m edgar_pipeline.cli all
-
-Streamlit Dashboard
-uv run streamlit run streamlit_app/app.py
-
-
-Open in browser:
-
-http://localhost:8501
-
-Dashboard Sections
-
-Executive Overview (KPIs)
-
-Filing Trends (Monthly / Yearly)
-
-Top Filing Companies (All Forms & 10-K)
-
-Long-Term 10-K Trends
-
-Outlier Detection (Spikes / Drops)
-
-Industry Benchmarking (optional enrichment)
-
-Note: Raw-layer data is intentionally not exposed in the dashboard.
-
-Industry Benchmarking (Optional Enrichment)
-
-SIC / NAICS codes are not included in the EDGAR master index.
-
-To enable benchmarking:
-
-Integrate SEC Company Facts API
-
-Map CIK → SIC / NAICS
-
-Aggregate into gold_10k_by_sic
-
-The current implementation demonstrates architectural extensibility.
-
-Quality Gates
-uv run pytest
-uv run mypy src
-
-Indexing & Performance
-
-Indexes are defined in:
-
-docker/mongo-init/init.js
-
-
-Including:
-
-Unique index on accession_number
-
-Compound index on (cik, date_filed)
-
-Index on form_type
-
-These indexes ensure efficient querying at scale.
